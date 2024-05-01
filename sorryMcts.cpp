@@ -7,6 +7,38 @@
 #include <limits>
 #include <numeric>
 
+class LoopCondition {
+public:
+  virtual bool condition() const = 0;
+  virtual void oneIterationComplete() = 0;
+};
+
+class TimeLoopCondition : public LoopCondition {
+public:
+  TimeLoopCondition(std::chrono::duration<double> timeLimit) : startTime_(std::chrono::high_resolution_clock::now()), timeLimit_(timeLimit) {}
+  bool condition() const override {
+    return std::chrono::high_resolution_clock::now() < startTime_+timeLimit_;
+  }
+  void oneIterationComplete() override {}
+private:
+  const std::chrono::high_resolution_clock::time_point startTime_;
+  const std::chrono::duration<double> timeLimit_;
+};
+
+class CountCondition : public LoopCondition {
+public:
+  CountCondition(int count) : count_(count) {}
+  bool condition() const override {
+    return current_ < count_;
+  }
+  void oneIterationComplete() override {
+    ++current_;
+  }
+private:
+  const int count_;
+  int current_{0};
+};
+
 struct Node {
   Node() = default;
   Node(const Action &a, Node *p) : action(a), parent(p) {}
@@ -50,25 +82,16 @@ SorryMcts::SorryMcts(double explorationConstant) : explorationConstant_(explorat
 }
 
 Action SorryMcts::pickBestAction(const Sorry &startingState, int rolloutCount) {
-  {
-    // Do a quick check and sidestep the whole process if there's only one possible action.
-    const auto& actions = startingState.getActions();
-    if (actions.size() == 1) {
-      return actions.at(0);
-    }
-  }
-  Node rootNode;
-  for (int i=0; i<rolloutCount; ++i) {
-    doSingleStep(startingState, &rootNode);
-  }
-  std::vector<size_t> indices(rootNode.successors.size());
-  std::iota(indices.begin(), indices.end(), 0);
-  int index = select(&rootNode, /*withExploration=*/false, indices);
-  printActions(&rootNode, 2);
-  return rootNode.successors.at(index)->action;
+  CountCondition condition(rolloutCount);
+  return pickBestAction(startingState, &condition);
 }
 
 Action SorryMcts::pickBestAction(const Sorry &startingState, std::chrono::duration<double> timeLimit) {
+  TimeLoopCondition condition(timeLimit);
+  return pickBestAction(startingState, &condition);
+}
+
+Action SorryMcts::pickBestAction(const Sorry &startingState, LoopCondition *loopCondition) {
   {
     // Do a quick check and sidestep the whole process if there's only one possible action.
     const auto& actions = startingState.getActions();
@@ -76,15 +99,16 @@ Action SorryMcts::pickBestAction(const Sorry &startingState, std::chrono::durati
       return actions.at(0);
     }
   }
-  const auto startTime = std::chrono::high_resolution_clock::now();
   Node rootNode;
-  while (std::chrono::high_resolution_clock::now() < startTime+timeLimit) {
+  while (loopCondition->condition()) {
     doSingleStep(startingState, &rootNode);
+    loopCondition->oneIterationComplete();
   }
+  // TODO: The below code assumes that all possible actions have been visited once.
   std::vector<size_t> indices(rootNode.successors.size());
   std::iota(indices.begin(), indices.end(), 0);
   int index = select(&rootNode, /*withExploration=*/false, indices);
-  printActions(&rootNode, 2);
+  // printActions(&rootNode, 2);
   return rootNode.successors.at(index)->action;
 }
 

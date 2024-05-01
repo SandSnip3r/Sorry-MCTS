@@ -8,6 +8,7 @@
 
 class Node;
 class Sorry;
+class LoopCondition;
 
 class SorryMcts {
 public:
@@ -17,6 +18,7 @@ public:
 private:
   const double explorationConstant_;
   std::mt19937 eng_{0};
+  Action pickBestAction(const Sorry &startingState, LoopCondition *loopCondition);
   void doSingleStep(const Sorry &startingState, Node *rootNode);
   int select(const Node *currentNode, bool withExploration, const std::vector<size_t> &indices);
   int rollout(Sorry state);

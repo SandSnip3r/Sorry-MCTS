@@ -1,10 +1,12 @@
 #include <iostream>
 
+#include "common.hpp"
 #include "sorry.hpp"
 #include "sorryMcts.hpp"
 
 using namespace std;
 
+// =============Board layout=============
 //        30      34    37
 // 28| |s|-|-|x| | | | |s|-|-|-|x| | |43
 // 27| |                           |s|44
@@ -23,6 +25,7 @@ using namespace std;
 // 14|s|                   |S| |.| | |57
 // 13| | |x|-|-|-|s| | | | |x|-|-|s| |58
 //        11       7     4   2  60
+// ======================================
 
 SorryMcts getSorryMcts() {
   // constexpr double explorationConstant_ = 0.5;
@@ -53,37 +56,63 @@ void doSingleMove() {
   cout << "For state " << s.toString() << " best action is " << bestAction.toString() << endl;
 }
 
-void playFullGame() {
-  Sorry s;
-  s.setStartingCards({Card::kFive, Card::kTwelve, Card::kThree, Card::kTwelve, Card::kEleven});
-  // s.setStartingPositions({0,0,0,0});
-  // s.setStartingCards({Card::kSorry, Card::kSorry, Card::kSorry, Card::kSorry, Card::kEleven});
-  mt19937 eng{0};
-  // s.setStartingPositions({0,0,0,1});
-  // s.setStartingPositions({13,31,0,60});
-  cout << "Starting state: " << s.toString() << endl;
+int playFullGameMcts(mt19937 doActionEng) {
   SorryMcts mcts = getSorryMcts();
-  while (!s.gameDone()) {
-    // Action bestAction = mcts.pickBestAction(s, chrono::milliseconds(100));
-    // Action bestAction = mcts.pickBestAction(s, chrono::milliseconds(150));
-    // Action bestAction = mcts.pickBestAction(s, chrono::milliseconds(300));
-    // Action bestAction = mcts.pickBestAction(s, chrono::seconds(1));
-    // Action bestAction = mcts.pickBestAction(s, chrono::seconds(3));
-    // Action bestAction = mcts.pickBestAction(s, chrono::seconds(15));
-    // Action bestAction = mcts.pickBestAction(s, chrono::minutes(10));
+  Sorry state;
+  state.drawRandomStartingCards(doActionEng);
+  while (!state.gameDone()) {
+    // Action bestAction = mcts.pickBestAction(state, chrono::milliseconds(100));
+    // Action bestAction = mcts.pickBestAction(state, chrono::milliseconds(150));
+    // Action bestAction = mcts.pickBestAction(state, chrono::milliseconds(300));
+    // Action bestAction = mcts.pickBestAction(state, chrono::seconds(1));
+    // Action bestAction = mcts.pickBestAction(state, chrono::seconds(3));
+    // Action bestAction = mcts.pickBestAction(state, chrono::seconds(15));
+    // Action bestAction = mcts.pickBestAction(state, chrono::minutes(10));
 
-    // Action bestAction = mcts.pickBestAction(s, 10000);
-    // Action bestAction = mcts.pickBestAction(s, 100000);
-    Action bestAction = mcts.pickBestAction(s, 1000000);
-    s.doAction(bestAction, eng);
-    cout << "Action " << bestAction.toString() << ". Resulting state " << s.toString() << endl;
-    // cout << "For state " << s.toString() << " best action is " << bestAction.toString() << endl;
+    // Action bestAction = mcts.pickBestAction(state, 10);
+    Action bestAction = mcts.pickBestAction(state, 100);
+    // Action bestAction = mcts.pickBestAction(state, 1000);
+    // Action bestAction = mcts.pickBestAction(state, 10000);
+    // Action bestAction = mcts.pickBestAction(state, 100000);
+    // Action bestAction = mcts.pickBestAction(state, 1000000);
+    state.doAction(bestAction, doActionEng);
   }
-  cout << "Game took " << s.getTotalActionCount() << " actions" << endl;
+  return state.getTotalActionCount();
+}
+
+int playFullGameRandomly(mt19937 doActionEng) {
+  mt19937 selectActionEng = createRandomEngine();
+  Sorry state;
+  state.drawRandomStartingCards(doActionEng);
+  while (!state.gameDone()) {
+    const auto actions = state.getActions();
+    uniform_int_distribution<int> dist(0, actions.size()-1);
+    const auto &action = actions.at(dist(selectActionEng));
+    state.doAction(action, doActionEng);
+  }
+  return state.getTotalActionCount();
+}
+
+void compare() {
+  constexpr const int kGameCount{100};
+  int randomTotalMoveCount=0;
+  int mctsTotalMoveCount=0;
+  for (int i=0; i<kGameCount; ++i) {
+    // Play an entire game completely randomly.
+    mt19937 eng(i);
+    const int randomMoveCount = playFullGameRandomly(eng);
+    randomTotalMoveCount += randomMoveCount;
+
+    // Play an entire game using MCTS.
+    const int mctsMoveCount = playFullGameMcts(eng);
+    mctsTotalMoveCount += mctsMoveCount;
+    cout << "Random game took " << randomMoveCount << " moves and MCTS game took " << mctsMoveCount << " moves" << endl;
+  }
+  cout << "Average random game length " << static_cast<double>(randomTotalMoveCount) / kGameCount << endl;
+  cout << "Average MCTS game length " << static_cast<double>(mctsTotalMoveCount) / kGameCount << endl;
 }
 
 int main() {
-  // doSingleMove();
-  playFullGame();
+  compare();
   return 0;
 }

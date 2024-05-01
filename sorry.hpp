@@ -14,6 +14,7 @@
 class Sorry {
 public:
   Sorry();
+  void drawRandomStartingCards(std::mt19937 &eng);
   void setStartingCards(const std::array<Card,5> &cards);
   void setStartingPositions(const std::array<int, 4> &positions);
   std::string toString() const;
@@ -24,8 +25,10 @@ public:
 private:
   std::vector<Card> deck_;
   std::array<Card,5> hand_;
+  bool haveStartingHand_{false};
   std::array<int, 4> piecePositions_ = {0,0,0,0};
   int actionCount_{0};
+  void drawRandomCardIntoIndex(int index, std::mt19937 &eng);
   void fillDeck();
   void addActionsForCard(int cardIndex, std::vector<Action> &actions) const;
   std::optional<int> getMoveResultingPos(int pieceIndex, int moveDistance) const;

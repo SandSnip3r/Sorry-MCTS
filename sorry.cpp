@@ -9,6 +9,13 @@ Sorry::Sorry() {
   fillDeck();
 }
 
+void Sorry::drawRandomStartingCards(std::mt19937 &eng) {
+  for (size_t i=0; i<hand_.size(); ++i) {
+    drawRandomCardIntoIndex(i, eng);
+  }
+  haveStartingHand_ = true;
+}
+
 void Sorry::setStartingCards(const std::array<Card,5> &cards) {
   // Remove cards from deck and insert into hand.
   for (size_t i=0; i<cards.size(); ++i) {
@@ -20,6 +27,7 @@ void Sorry::setStartingCards(const std::array<Card,5> &cards) {
     iter_swap(it, prev(deck_.end()));
     deck_.erase(prev(deck_.end()));
   }
+  haveStartingHand_ = true;
 }
 
 void Sorry::setStartingPositions(const std::array<int, 4> &positions) {
@@ -32,6 +40,9 @@ void Sorry::setStartingPositions(const std::array<int, 4> &positions) {
 }
 
 std::string Sorry::toString() const {
+  if (!haveStartingHand_) {
+    throw std::runtime_error("Called toString() without a starting hand set");
+  }
   std::stringstream ss;
   ss << '{';
   // Stringify hand
@@ -58,6 +69,9 @@ std::string Sorry::toString() const {
 }
 
 std::vector<Action> Sorry::getActions() const {
+  if (!haveStartingHand_) {
+    throw std::runtime_error("Called getActions() without a starting hand set");
+  }
   if (gameDone()) {
     return {};
   }
@@ -95,7 +109,25 @@ std::vector<Action> Sorry::getActions() const {
   return result;
 }
 
+void Sorry::drawRandomCardIntoIndex(int index, std::mt19937 &eng) {
+  // We do this by overwriting our current card with a random card from the deck.
+  std::uniform_int_distribution<int> dist(0, deck_.size()-1);
+  const int drawnCardIndex = dist(eng);
+  hand_[index] = deck_[drawnCardIndex];
+  iter_swap(deck_.begin() + drawnCardIndex, prev(deck_.end()));
+  deck_.erase(prev(deck_.end()));
+
+  if (deck_.empty()) {
+    fillDeck();
+    const auto tmpHand = hand_;
+    setStartingCards(tmpHand);
+  }
+}
+
 void Sorry::doAction(const Action &action, std::mt19937 &eng) {
+  if (!haveStartingHand_) {
+    throw std::runtime_error("Called doAction() without a starting hand set");
+  }
   if (action.actionType != Action::ActionType::kDiscard) {
     // Move one or two pieces
     piecePositions_[action.piece1Index] = posAfterSlide(action.move1Destination);
@@ -106,19 +138,7 @@ void Sorry::doAction(const Action &action, std::mt19937 &eng) {
   }
 
   // Finally. Discard card.
-  // We do this by overwriting our current card with a random card from the deck.
-  std::uniform_int_distribution<int> dist(0, deck_.size()-1);
-  const int drawnCardIndex = dist(eng);
-  hand_[action.cardIndex] = deck_[drawnCardIndex];
-  iter_swap(deck_.begin() + drawnCardIndex, prev(deck_.end()));
-  deck_.erase(prev(deck_.end()));
-
-  if (deck_.empty()) {
-    fillDeck();
-    const auto tmpHand = hand_;
-    setStartingCards(tmpHand);
-  }
-
+  drawRandomCardIntoIndex(action.cardIndex, eng);
   ++actionCount_;
 
   // At the end, do a quick sanity check to make that no two pieces are in the same spot, apart from start and home.
