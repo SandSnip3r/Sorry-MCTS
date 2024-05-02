@@ -173,16 +173,16 @@ void Sorry::fillDeck() {
   // 4 of every other card (2's, 3's, 4's, 5's, 7's, 8's, 10's, 11's, 12's,)
   // 4 Sorry cards
   static constexpr std::array kDeck = { Card::kOne,    Card::kOne,    Card::kOne,    Card::kOne,    Card::kOne,
-                                    Card::kTwo,    Card::kTwo,    Card::kTwo,    Card::kTwo,
-                                    Card::kThree,  Card::kThree,  Card::kThree,  Card::kThree,
-                                    Card::kFour,   Card::kFour,   Card::kFour,   Card::kFour,
-                                    Card::kFive,   Card::kFive,   Card::kFive,   Card::kFive,
-                                    Card::kSeven,  Card::kSeven,  Card::kSeven,  Card::kSeven,
-                                    Card::kEight,  Card::kEight,  Card::kEight,  Card::kEight,
-                                    Card::kTen,    Card::kTen,    Card::kTen,    Card::kTen,
-                                    Card::kEleven, Card::kEleven, Card::kEleven, Card::kEleven,
-                                    Card::kTwelve, Card::kTwelve, Card::kTwelve, Card::kTwelve,
-                                    Card::kSorry,  Card::kSorry,  Card::kSorry,  Card::kSorry };
+                                        Card::kTwo,    Card::kTwo,    Card::kTwo,    Card::kTwo,
+                                        Card::kThree,  Card::kThree,  Card::kThree,  Card::kThree,
+                                        Card::kFour,   Card::kFour,   Card::kFour,   Card::kFour,
+                                        Card::kFive,   Card::kFive,   Card::kFive,   Card::kFive,
+                                        Card::kSeven,  Card::kSeven,  Card::kSeven,  Card::kSeven,
+                                        Card::kEight,  Card::kEight,  Card::kEight,  Card::kEight,
+                                        Card::kTen,    Card::kTen,    Card::kTen,    Card::kTen,
+                                        Card::kEleven, Card::kEleven, Card::kEleven, Card::kEleven,
+                                        Card::kTwelve, Card::kTwelve, Card::kTwelve, Card::kTwelve,
+                                        Card::kSorry,  Card::kSorry,  Card::kSorry,  Card::kSorry };
   deck_.insert(deck_.end(), kDeck.begin(), kDeck.end());
 }
 
