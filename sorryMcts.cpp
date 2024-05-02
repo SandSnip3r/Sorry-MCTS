@@ -215,7 +215,7 @@ void SorryMcts::printActions(const Node *current, int levels, int currentLevel) 
   const auto [minAverageMoveCount, maxAverageMoveCount] = current->getMinAndMaxAverageMoveCountOfSuccessors(indices);
   for (const Node *successor : current->successors) {
     const double score = nodeScore(successor, current, maxAverageMoveCount, minAverageMoveCount, /*withExploration=*/false);
-    printf("%s[%7.5f] Action %22s average %5.2f moves, count: %5d, parent count: %6d\n", std::string(currentLevel*2, ' ').c_str(), score, successor->action.toString().c_str(), successor->averageMoveCount(), successor->gameCount, current->gameCount);
+    printf("%s[%7.5f] Action %27s average %5.2f moves, count: %5d, parent count: %6d\n", std::string(currentLevel*2, ' ').c_str(), score, successor->action.toString().c_str(), successor->averageMoveCount(), successor->gameCount, current->gameCount);
     printActions(successor, levels, currentLevel+1);
   }
 }

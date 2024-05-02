@@ -26,15 +26,16 @@ private:
   std::vector<Card> deck_;
   std::array<Card,5> hand_;
   bool haveStartingHand_{false};
-  std::array<int, 4> piecePositions_ = {0,0,0,0};
+  std::array<int, 4> piecePositions_ = {2,0,0,0}; // Always start the game with one piece just outside of Start.
   int actionCount_{0};
   void drawRandomCardIntoIndex(int index, std::mt19937 &eng);
   void fillDeck();
-  void addActionsForCard(int cardIndex, std::vector<Action> &actions) const;
+  void addActionsForCard(Card card, std::vector<Action> &actions) const;
   std::optional<int> getMoveResultingPos(int pieceIndex, int moveDistance) const;
   std::optional<std::pair<int,int>> getDoubleMoveResultingPos(int piece1Index, int move1Distance, int piece2Index, int move2Distance) const;
   int slideLengthAtPos(int pos) const;
   int posAfterSlide(int pos) const;
+  size_t indexOfCardInHand(Card card) const;
 };
 
 #endif // SORRY_HPP_

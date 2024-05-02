@@ -87,7 +87,7 @@ std::vector<Action> Sorry::getActions() const {
     if (alreadyHandledThisCard) {
       continue;
     }
-    addActionsForCard(i, result);
+    addActionsForCard(hand_[i], result);
   }
 
   if (result.empty()) {
@@ -102,7 +102,7 @@ std::vector<Action> Sorry::getActions() const {
         }
       }
       if (!alreadyDiscarded) {
-        result.push_back(Action::discard(i));
+        result.push_back(Action::discard(hand_[i]));
       }
     }
   }
@@ -138,7 +138,7 @@ void Sorry::doAction(const Action &action, std::mt19937 &eng) {
   }
 
   // Finally. Discard card.
-  drawRandomCardIntoIndex(action.cardIndex, eng);
+  drawRandomCardIntoIndex(indexOfCardInHand(action.card), eng);
   ++actionCount_;
 
   // At the end, do a quick sanity check to make that no two pieces are in the same spot, apart from start and home.
@@ -186,17 +186,16 @@ void Sorry::fillDeck() {
   deck_.insert(deck_.end(), kDeck.begin(), kDeck.end());
 }
 
-void Sorry::addActionsForCard(int cardIndex, std::vector<Action> &actions) const {
-  auto tryAddMoveToAllPositions = [this, &actions](int cardIndex, int moveAmount) {
+void Sorry::addActionsForCard(Card card, std::vector<Action> &actions) const {
+  auto tryAddMoveToAllPositions = [this, &actions](Card card, int moveAmount) {
     for (size_t pieceIndex=0; pieceIndex<piecePositions_.size(); ++pieceIndex) {
       auto moveResult = getMoveResultingPos(pieceIndex, moveAmount);
       if (moveResult) {
-        // Use card `card`(`cardIndex`) and move piece `pieceIndex` from `piecePositions_[pieceIndex]` to `*moveResult`
-        actions.push_back(Action::singleMove(cardIndex, pieceIndex, *moveResult));
+        // Use card `card` and move piece `pieceIndex` from `piecePositions_[pieceIndex]` to `*moveResult`
+        actions.push_back(Action::singleMove(card, pieceIndex, *moveResult));
       }
     }
   };
-  const Card card = hand_[cardIndex];
   // Add the state from simply moving forward
   {
     int moveAmount;
@@ -207,7 +206,7 @@ void Sorry::addActionsForCard(int cardIndex, std::vector<Action> &actions) const
     }
 
     // Note: This does not produce any duplicate actions because no two pieces can be in the same position (moving out of home is not handled here).
-    tryAddMoveToAllPositions(cardIndex, moveAmount);
+    tryAddMoveToAllPositions(card, moveAmount);
   }
 
   // Move piece out of start, if possible.
@@ -224,7 +223,7 @@ void Sorry::addActionsForCard(int cardIndex, std::vector<Action> &actions) const
       for (size_t pieceIndex=0; pieceIndex<piecePositions_.size(); ++pieceIndex) {
         if (piecePositions_[pieceIndex] == 0) {
           // This piece is in start.
-          actions.push_back(Action::singleMove(cardIndex, pieceIndex, 2));
+          actions.push_back(Action::singleMove(card, pieceIndex, 2));
           // Note: Breaking after moving one item from start prevents duplicate actions. Any other piece in start results in the same action and pieces not in start don't apply here.
           break;
         }
@@ -234,7 +233,7 @@ void Sorry::addActionsForCard(int cardIndex, std::vector<Action> &actions) const
 
   if (card == Card::kTen) {
     // 10 can also go backward 1.
-    tryAddMoveToAllPositions(cardIndex, -1);
+    tryAddMoveToAllPositions(card, -1);
   }
   if (card == Card::kSeven) {
     // 7 can have the 7 split across two pieces
@@ -247,8 +246,8 @@ void Sorry::addActionsForCard(int cardIndex, std::vector<Action> &actions) const
           }
           auto doubleMoveResult = getDoubleMoveResultingPos(piece1Index, move1, piece2Index, move2);
           if (doubleMoveResult) {
-            // Use card `card`(`cardIndex`) and move piece `piece1Index` from `piecePositions_[piece1Index]` to `doubleMoveResult->first` and move piece `piece2Index` from `piecePositions_[piece2Index]` to `doubleMoveResult->second`.
-            actions.push_back(Action::doubleMove(cardIndex, piece1Index, doubleMoveResult->first, piece2Index, doubleMoveResult->second));
+            // Use card `card` and move piece `piece1Index` from `piecePositions_[piece1Index]` to `doubleMoveResult->first` and move piece `piece2Index` from `piecePositions_[piece2Index]` to `doubleMoveResult->second`.
+            actions.push_back(Action::doubleMove(card, piece1Index, doubleMoveResult->first, piece2Index, doubleMoveResult->second));
           }
         }
       }
@@ -457,4 +456,14 @@ int Sorry::posAfterSlide(int pos) const {
     return pos + (slideLength-1);
   }
   return pos;
+}
+
+size_t Sorry::indexOfCardInHand(Card card) const {
+  // Find the index of this card.
+  for (size_t i=0; i<hand_.size(); ++i) {
+    if (hand_[i] == card) {
+      return i;
+    }
+  }
+  throw std::runtime_error("Do not have card "+::toString(card)+" in hand");
 }

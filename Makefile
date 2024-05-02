@@ -13,6 +13,8 @@ OBJ_FILES := $(SRC_FILES:.cpp=.o)
 # Executable name
 EXEC := main
 
+all: $(EXEC)
+
 # Build rule for the executable
 $(EXEC): $(OBJ_FILES)
 	$(CC) $(CFLAGS) -o $@ $^
