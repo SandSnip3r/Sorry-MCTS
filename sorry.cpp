@@ -5,8 +5,67 @@
 #include <sstream>
 #include <stdexcept>
 
+void Deck::initialize() {
+  // 5 one's
+  // 4 of every other card (2's, 3's, 4's, 5's, 7's, 8's, 10's, 11's, 12's,)
+  // 4 Sorry cards
+  cards_ = { Card::kOne,    Card::kOne,    Card::kOne,    Card::kOne,    Card::kOne,
+             Card::kTwo,    Card::kTwo,    Card::kTwo,    Card::kTwo,
+             Card::kThree,  Card::kThree,  Card::kThree,  Card::kThree,
+             Card::kFour,   Card::kFour,   Card::kFour,   Card::kFour,
+             Card::kFive,   Card::kFive,   Card::kFive,   Card::kFive,
+             Card::kSeven,  Card::kSeven,  Card::kSeven,  Card::kSeven,
+             Card::kEight,  Card::kEight,  Card::kEight,  Card::kEight,
+             Card::kTen,    Card::kTen,    Card::kTen,    Card::kTen,
+             Card::kEleven, Card::kEleven, Card::kEleven, Card::kEleven,
+             Card::kTwelve, Card::kTwelve, Card::kTwelve, Card::kTwelve,
+             Card::kSorry,  Card::kSorry,  Card::kSorry,  Card::kSorry };
+  size_ = cards_.size();
+}
+
+void Deck::removeSpecificCard(Card card) {
+  auto it = std::find(cards_.begin(), cards_.end(), card);
+  if (it == cards_.end()) {
+    throw std::runtime_error("Card not found in deck");
+  }
+  removeCard(it);
+}
+
+Card Deck::drawRandomCard(std::mt19937 &eng) {
+  std::uniform_int_distribution<int> dist(0, size_-1);
+  const int drawnCardIndex = dist(eng);
+  Card card = cards_[drawnCardIndex];
+  removeCard(cards_.begin() + drawnCardIndex);
+  return card;
+}
+
+size_t Deck::size() const {
+  return size_;
+}
+
+bool Deck::empty() const {
+  return size_ == 0;
+}
+
+void Deck::removeCard(CardsType::iterator it) {
+  std::iter_swap(it, cards_.begin() + size_-1);
+  --size_;
+}
+
+bool operator==(const Deck &lhs, const Deck &rhs) {
+  if (lhs.size_ != rhs.size_) {
+    return false;
+  }
+  for (size_t i=0; i<lhs.size_; ++i) {
+    if (lhs.cards_[i] != rhs.cards_[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
 Sorry::Sorry() {
-  fillDeck();
+  deck_.initialize();
 }
 
 void Sorry::drawRandomStartingCards(std::mt19937 &eng) {
@@ -16,16 +75,11 @@ void Sorry::drawRandomStartingCards(std::mt19937 &eng) {
   haveStartingHand_ = true;
 }
 
-void Sorry::setStartingCards(const std::array<Card,5> &cards) {
+void Sorry::setStartingCards(std::array<Card,5> cards) {
   // Remove cards from deck and insert into hand.
   for (size_t i=0; i<cards.size(); ++i) {
     hand_[i] = cards[i];
-    auto it = find(deck_.begin(), deck_.end(), cards[i]);
-    if (it == deck_.end()) {
-      throw std::runtime_error("Starting card not found in deck");
-    }
-    iter_swap(it, prev(deck_.end()));
-    deck_.erase(prev(deck_.end()));
+    deck_.removeSpecificCard(cards[i]);
   }
   haveStartingHand_ = true;
 }
@@ -46,13 +100,7 @@ std::string Sorry::toString() const {
   std::stringstream ss;
   ss << '{';
   // Stringify hand
-  ss << "Hand:";
-  for (int i=0; i<5; ++i) {
-    ss << ::toString(hand_[i]);
-    if (i != 4) {
-      ss << ',';
-    }
-  }
+  ss << "Hand:" << handToString();
   // Stringify deck
   ss << ";deck:" << deck_.size();
   // Stringify piece positions
@@ -68,6 +116,20 @@ std::string Sorry::toString() const {
   return ss.str();
 }
 
+std::string Sorry::handToString() const {
+  if (!haveStartingHand_) {
+    throw std::runtime_error("Called handToString() without a starting hand set");
+  }
+  std::stringstream ss;
+  for (int i=0; i<5; ++i) {
+    ss << ::toString(hand_[i]);
+    if (i != 4) {
+      ss << ',';
+    }
+  }
+  return ss.str();
+}
+
 std::vector<Action> Sorry::getActions() const {
   if (!haveStartingHand_) {
     throw std::runtime_error("Called getActions() without a starting hand set");
@@ -76,6 +138,7 @@ std::vector<Action> Sorry::getActions() const {
     return {};
   }
   std::vector<Action> result;
+  result.reserve(60); // Save some time by doing one allocation large enough for most invocations.
   for (size_t i=0; i<hand_.size(); ++i) {
     bool alreadyHandledThisCard = false;
     for (int j=static_cast<int>(i)-1; j>=0; --j) {
@@ -110,17 +173,11 @@ std::vector<Action> Sorry::getActions() const {
 }
 
 void Sorry::drawRandomCardIntoIndex(int index, std::mt19937 &eng) {
-  // We do this by overwriting our current card with a random card from the deck.
-  std::uniform_int_distribution<int> dist(0, deck_.size()-1);
-  const int drawnCardIndex = dist(eng);
-  hand_[index] = deck_[drawnCardIndex];
-  iter_swap(deck_.begin() + drawnCardIndex, prev(deck_.end()));
-  deck_.erase(prev(deck_.end()));
+  hand_[index] = deck_.drawRandomCard(eng);
 
   if (deck_.empty()) {
-    fillDeck();
-    const auto tmpHand = hand_;
-    setStartingCards(tmpHand);
+    deck_.initialize();
+    setStartingCards(hand_);
   }
 }
 
@@ -166,24 +223,6 @@ bool Sorry::gameDone() const {
 
 int Sorry::getTotalActionCount() const {
   return actionCount_;
-}
-
-void Sorry::fillDeck() {
-  // 5 one's
-  // 4 of every other card (2's, 3's, 4's, 5's, 7's, 8's, 10's, 11's, 12's,)
-  // 4 Sorry cards
-  static constexpr std::array kDeck = { Card::kOne,    Card::kOne,    Card::kOne,    Card::kOne,    Card::kOne,
-                                        Card::kTwo,    Card::kTwo,    Card::kTwo,    Card::kTwo,
-                                        Card::kThree,  Card::kThree,  Card::kThree,  Card::kThree,
-                                        Card::kFour,   Card::kFour,   Card::kFour,   Card::kFour,
-                                        Card::kFive,   Card::kFive,   Card::kFive,   Card::kFive,
-                                        Card::kSeven,  Card::kSeven,  Card::kSeven,  Card::kSeven,
-                                        Card::kEight,  Card::kEight,  Card::kEight,  Card::kEight,
-                                        Card::kTen,    Card::kTen,    Card::kTen,    Card::kTen,
-                                        Card::kEleven, Card::kEleven, Card::kEleven, Card::kEleven,
-                                        Card::kTwelve, Card::kTwelve, Card::kTwelve, Card::kTwelve,
-                                        Card::kSorry,  Card::kSorry,  Card::kSorry,  Card::kSorry };
-  deck_.insert(deck_.end(), kDeck.begin(), kDeck.end());
 }
 
 void Sorry::addActionsForCard(Card card, std::vector<Action> &actions) const {
@@ -258,7 +297,7 @@ void Sorry::addActionsForCard(Card card, std::vector<Action> &actions) const {
 }
 
 std::optional<int> Sorry::getMoveResultingPos(int pieceIndex, int moveDistance) const {
-  int startingPosition = piecePositions_[pieceIndex];
+  const int startingPosition = piecePositions_[pieceIndex];
   if (startingPosition == 0) {
     // Is in start. Can't move.
     return {};
@@ -466,4 +505,18 @@ size_t Sorry::indexOfCardInHand(Card card) const {
     }
   }
   throw std::runtime_error("Do not have card "+::toString(card)+" in hand");
+}
+
+bool operator==(const Sorry &lhs, const Sorry &rhs) {
+  for (size_t i=0; i<lhs.hand_.size(); ++i) {
+    if (lhs.hand_[i] != rhs.hand_[i]) {
+      return false;
+    }
+  }
+  for (size_t i=0; i<lhs.piecePositions_.size(); ++i) {
+    if (lhs.piecePositions_[i] != rhs.piecePositions_[i]) {
+      return false;
+    }
+  }
+  return lhs.deck_ == rhs.deck_;
 }
