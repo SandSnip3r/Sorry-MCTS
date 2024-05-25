@@ -39,6 +39,8 @@ private:
   int current_{0};
 };
 
+using namespace sorry;
+
 struct Node {
   Node() = default;
   Node(const Sorry &s, const Action &a, Node *p) : state(s), action(a), parent(p) {}

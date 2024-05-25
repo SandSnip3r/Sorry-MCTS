@@ -11,6 +11,8 @@
 #include <utility>
 #include <vector>
 
+namespace sorry {
+
 class Deck {
 public:
   void initialize();
@@ -56,5 +58,6 @@ private:
   friend bool operator==(const Sorry &lhs, const Sorry &rhs);
 };
 
+} // namespace sorry
 
 #endif // SORRY_HPP_

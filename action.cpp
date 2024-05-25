@@ -3,6 +3,8 @@
 #include <sstream>
 #include <stdexcept>
 
+namespace sorry {
+
 Action Action::discard(Card card) {
   Action a;
   a.actionType = ActionType::kDiscard;
@@ -41,7 +43,7 @@ std::string Action::toString() const {
   } else {
     throw std::runtime_error("Unknown action type");
   }
-  ss << ',' << ::toString(card);
+  ss << ',' << sorry::toString(card);
   if (actionType != ActionType::kDiscard) {
     ss << ',' << piece1Index << ',' << move1Destination;
   }
@@ -69,3 +71,5 @@ bool operator==(const Action &lhs, const Action &rhs) {
            lhs.move2Destination == rhs.move2Destination;
   }
 }
+
+} // namespace sorry

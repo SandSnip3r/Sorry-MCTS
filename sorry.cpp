@@ -5,6 +5,8 @@
 #include <sstream>
 #include <stdexcept>
 
+namespace sorry {
+
 void Deck::initialize() {
   // 5 one's
   // 4 of every other card (2's, 3's, 4's, 5's, 7's, 8's, 10's, 11's, 12's,)
@@ -52,7 +54,7 @@ void Deck::removeCard(CardsType::iterator it) {
   --size_;
 }
 
-bool operator==(const Deck &lhs, const Deck &rhs) {
+bool operator==(const sorry::Deck &lhs, const sorry::Deck &rhs) {
   if (lhs.size_ != rhs.size_) {
     return false;
   }
@@ -122,7 +124,7 @@ std::string Sorry::handToString() const {
   }
   std::stringstream ss;
   for (int i=0; i<5; ++i) {
-    ss << ::toString(hand_[i]);
+    ss << sorry::toString(hand_[i]);
     if (i != 4) {
       ss << ',';
     }
@@ -504,10 +506,10 @@ size_t Sorry::indexOfCardInHand(Card card) const {
       return i;
     }
   }
-  throw std::runtime_error("Do not have card "+::toString(card)+" in hand");
+  throw std::runtime_error("Do not have card "+sorry::toString(card)+" in hand");
 }
 
-bool operator==(const Sorry &lhs, const Sorry &rhs) {
+bool operator==(const sorry::Sorry &lhs, const sorry::Sorry &rhs) {
   for (size_t i=0; i<lhs.hand_.size(); ++i) {
     if (lhs.hand_[i] != rhs.hand_[i]) {
       return false;
@@ -520,3 +522,5 @@ bool operator==(const Sorry &lhs, const Sorry &rhs) {
   }
   return lhs.deck_ == rhs.deck_;
 }
+
+} // namespace sorry

@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <string>
 
+namespace sorry {
+
 enum class Card : uint8_t {
   kOne = 1,
   kTwo = 2,
@@ -19,5 +21,7 @@ enum class Card : uint8_t {
 };
 
 std::string toString(Card c);
+
+} // namespace sorry
 
 #endif // CARD_HPP_

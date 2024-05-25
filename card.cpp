@@ -2,6 +2,8 @@
 
 #include <stdexcept>
 
+namespace sorry {
+
 std::string toString(Card c) {
   if (c == Card::kOne) {
     return "One";
@@ -38,3 +40,5 @@ std::string toString(Card c) {
   }
   throw std::runtime_error("Invalid card toString");
 }
+
+} // namespace sorry

@@ -5,6 +5,8 @@
 
 #include <string>
 
+namespace sorry {
+
 class Action {
 public:
   enum class ActionType {
@@ -26,5 +28,8 @@ public:
 };
 
 bool operator==(const Action &lhs, const Action &rhs);
+
+} // namespace sorry
+
 
 #endif // ACTION_HPP_
