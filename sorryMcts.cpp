@@ -41,12 +41,13 @@ private:
 
 struct Node {
   Node() = default;
-  Node(const Action &a, Node *p) : action(a), parent(p) {}
+  Node(const Sorry &s, const Action &a, Node *p) : state(s), action(a), parent(p) {}
   ~Node() {
     for (Node *successor : successors) {
       delete successor;
     }
   }
+  Sorry state;
   Action action;
   Node *parent{nullptr};
   std::vector<Node*> successors;
@@ -124,7 +125,8 @@ void SorryMcts::doSingleStep(const Sorry &startingState, Node *rootNode) {
       // If we don't yet have a node for this action, select it.
       bool foundOurAction = false;
       for (size_t i=0; i<currentNode->successors.size(); ++i) {
-        if (currentNode->successors.at(i)->action == action) {
+        if (currentNode->successors.at(i)->state == state &&
+            currentNode->successors.at(i)->action == action) {
           // This is our action.
           indices.push_back(i);
           foundOurAction = true;
@@ -136,7 +138,7 @@ void SorryMcts::doSingleStep(const Sorry &startingState, Node *rootNode) {
         continue;
       }
       // Never visited this node, expand to it then rollout.
-      currentNode->successors.push_back(new Node(action, currentNode));
+      currentNode->successors.push_back(new Node(state, action, currentNode));
       state.doAction(action, eng_);
       int result = rollout(state);
       // Propagate the result of the rollout back up through the parents.

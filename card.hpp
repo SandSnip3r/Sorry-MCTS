@@ -1,9 +1,10 @@
 #ifndef CARD_HPP_
 #define CARD_HPP_
 
+#include <cstdint>
 #include <string>
 
-enum class Card {
+enum class Card : uint8_t {
   kOne = 1,
   kTwo = 2,
   kThree = 3,
