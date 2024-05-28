@@ -3,8 +3,12 @@
 
 #include "action.hpp"
 
+#include <atomic>
 #include <chrono>
+#include <mutex>
 #include <random>
+#include <utility>
+#include <vector>
 
 class Node;
 class LoopCondition;
@@ -13,17 +17,41 @@ namespace sorry {
 class Sorry;
 } // namespace sorry
 
+namespace internal {
+
+class LoopCondition {
+public:
+  virtual bool condition() const = 0;
+  virtual void oneIterationComplete() = 0;
+};
+
+} // namespace internal
+
+class ExplicitTerminator : public internal::LoopCondition {
+public:
+  void setDone(bool done);
+  bool condition() const override;
+  void oneIterationComplete() override;
+private:
+  std::atomic<bool> done_{false};
+};
+
 class SorryMcts {
 public:
-  SorryMcts(double explorationConstant);
-  sorry::Action pickBestAction(const sorry::Sorry &startingState, int rolloutCount);
-  sorry::Action pickBestAction(const sorry::Sorry &startingState, std::chrono::duration<double> timeLimit);
+  explicit SorryMcts(double explorationConstant);
+  void run(const sorry::Sorry &startingState, int rolloutCount);
+  void run(const sorry::Sorry &startingState, std::chrono::duration<double> timeLimit);
+  void run(const sorry::Sorry &startingState, internal::LoopCondition *loopCondition);
+  sorry::Action pickBestAction() const;
+  std::vector<std::pair<sorry::Action, double>> getActionsWithScores() const;
 private:
   const double explorationConstant_;
   std::mt19937 eng_{0};
-  sorry::Action pickBestAction(const sorry::Sorry &startingState, LoopCondition *loopCondition);
+
+  mutable std::mutex treeMutex_;
+  Node *rootNode_{nullptr};
   void doSingleStep(const sorry::Sorry &startingState, Node *rootNode);
-  int select(const Node *currentNode, bool withExploration, const std::vector<size_t> &indices);
+  int select(const Node *currentNode, bool withExploration, const std::vector<size_t> &indices) const;
   int rollout(sorry::Sorry state);
   void backprop(Node *current, int moveCount);
   double nodeScore(const Node *current, const Node *parent, double maxAverageMoveCount, double minAverageMoveCount, bool withExploration) const;

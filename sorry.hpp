@@ -41,6 +41,9 @@ public:
   void doAction(const Action &action, std::mt19937 &eng);
   bool gameDone() const;
   int getTotalActionCount() const;
+  std::array<Card,5> getHand() const;
+  std::array<int, 4> getPiecePositions() const;
+
 private:
   Deck deck_;
   std::array<Card,5> hand_;

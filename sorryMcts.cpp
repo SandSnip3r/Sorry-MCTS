@@ -7,13 +7,7 @@
 #include <limits>
 #include <numeric>
 
-class LoopCondition {
-public:
-  virtual bool condition() const = 0;
-  virtual void oneIterationComplete() = 0;
-};
-
-class TimeLoopCondition : public LoopCondition {
+class TimeLoopCondition : public internal::LoopCondition {
 public:
   TimeLoopCondition(std::chrono::duration<double> timeLimit) : startTime_(std::chrono::high_resolution_clock::now()), timeLimit_(timeLimit) {}
   bool condition() const override {
@@ -25,7 +19,7 @@ private:
   const std::chrono::duration<double> timeLimit_;
 };
 
-class CountCondition : public LoopCondition {
+class CountCondition : public internal::LoopCondition {
 public:
   CountCondition(int count) : count_(count) {}
   bool condition() const override {
@@ -38,6 +32,16 @@ private:
   const int count_;
   int current_{0};
 };
+
+void ExplicitTerminator::setDone(bool done) {
+  done_ = done;
+}
+
+bool ExplicitTerminator::condition() const {
+  return !done_;
+}
+
+void ExplicitTerminator::oneIterationComplete() {}
 
 using namespace sorry;
 
@@ -84,39 +88,69 @@ SorryMcts::SorryMcts(double explorationConstant) : explorationConstant_(explorat
   eng_ = createRandomEngine();
 }
 
-Action SorryMcts::pickBestAction(const Sorry &startingState, int rolloutCount) {
+void SorryMcts::run(const Sorry &startingState, int rolloutCount) {
   CountCondition condition(rolloutCount);
-  return pickBestAction(startingState, &condition);
+  run(startingState, &condition);
 }
 
-Action SorryMcts::pickBestAction(const Sorry &startingState, std::chrono::duration<double> timeLimit) {
+void SorryMcts::run(const Sorry &startingState, std::chrono::duration<double> timeLimit) {
   TimeLoopCondition condition(timeLimit);
-  return pickBestAction(startingState, &condition);
+  run(startingState, &condition);
 }
 
-Action SorryMcts::pickBestAction(const Sorry &startingState, LoopCondition *loopCondition) {
-  {
-    // Do a quick check and sidestep the whole process if there's only one possible action.
-    const auto& actions = startingState.getActions();
-    if (actions.size() == 1) {
-      return actions.at(0);
-    }
+void SorryMcts::run(const Sorry &startingState, internal::LoopCondition *loopCondition) {
+  if (rootNode_ != nullptr) {
+    delete rootNode_;
   }
-  Node rootNode;
+  rootNode_ = new Node;
   while (loopCondition->condition()) {
-    doSingleStep(startingState, &rootNode);
+    doSingleStep(startingState, rootNode_);
+    if (startingState.getActions().size() == 1) {
+      // If there's only one option, we're done.
+      return;
+    }
     loopCondition->oneIterationComplete();
   }
+}
+
+sorry::Action SorryMcts::pickBestAction() const {
+  if (rootNode_ == nullptr) {
+    throw std::runtime_error("Asking for best action, but have no root node");
+  }
   // TODO: The below code assumes that all possible actions have been visited once.
-  std::vector<size_t> indices(rootNode.successors.size());
+  std::vector<size_t> indices(rootNode_->successors.size());
   std::iota(indices.begin(), indices.end(), 0);
-  int index = select(&rootNode, /*withExploration=*/false, indices);
-  // printActions(&rootNode, 2);
-  return rootNode.successors.at(index)->action;
+  int index = select(rootNode_, /*withExploration=*/false, indices);
+  // printActions(rootNode_, 2);
+  return rootNode_->successors.at(index)->action;
+}
+
+std::vector<std::pair<sorry::Action, double>> SorryMcts::getActionsWithScores() const {
+  std::unique_lock<std::mutex> lock(treeMutex_);
+  if (rootNode_ == nullptr) {
+    // No known actions yet.
+    return {};
+  }
+  std::vector<size_t> indices(rootNode_->successors.size());
+  std::iota(indices.begin(), indices.end(), 0);
+  std::vector<double> scores;
+  const auto [minAverageMoveCount, maxAverageMoveCount] = rootNode_->getMinAndMaxAverageMoveCountOfSuccessors(indices);
+  for (size_t index : indices) {
+    const Node *successor = rootNode_->successors.at(index);
+    const double score = nodeScore(successor, rootNode_, maxAverageMoveCount, minAverageMoveCount, /*withExploration=*/false);
+    scores.push_back(score);
+  }
+  std::vector<std::pair<sorry::Action, double>> result;
+  for (size_t i=0; i<indices.size(); ++i) {
+    result.emplace_back(rootNode_->successors.at(i)->action, scores.at(i));
+  }
+  return result;
+
 }
 
 void SorryMcts::doSingleStep(const Sorry &startingState, Node *rootNode) {
   Sorry state = startingState;
+  std::unique_lock<std::mutex> lock(treeMutex_);
   Node *currentNode = rootNode;
   while (!state.gameDone()) {
     // Get all actions.
@@ -159,7 +193,7 @@ void SorryMcts::doSingleStep(const Sorry &startingState, Node *rootNode) {
   backprop(currentNode, state.getTotalActionCount());
 }
 
-int SorryMcts::select(const Node *currentNode, bool withExploration, const std::vector<size_t> &indices) {
+int SorryMcts::select(const Node *currentNode, bool withExploration, const std::vector<size_t> &indices) const {
   if (indices.size() == 1) {
     return indices.at(0);
   }
@@ -203,7 +237,6 @@ void SorryMcts::backprop(Node *current, int moveCount) {
 
 double SorryMcts::nodeScore(const Node *current, const Node *parent, double maxAverageMoveCount, double minAverageMoveCount, bool withExploration) const {
   double score = 1 - (current->averageMoveCount() - minAverageMoveCount) / (maxAverageMoveCount - minAverageMoveCount);
-  // double score = 1 - current->averageMoveCount() / maxAverageMoveCount; // Non-scaled version
   if (!withExploration) {
     return score;
   }

@@ -227,6 +227,14 @@ int Sorry::getTotalActionCount() const {
   return actionCount_;
 }
 
+std::array<Card,5> Sorry::getHand() const {
+  return hand_;
+}
+
+std::array<int, 4> Sorry::getPiecePositions() const {
+  return piecePositions_;
+}
+
 void Sorry::addActionsForCard(Card card, std::vector<Action> &actions) const {
   auto tryAddMoveToAllPositions = [this, &actions](Card card, int moveAmount) {
     for (size_t pieceIndex=0; pieceIndex<piecePositions_.size(); ++pieceIndex) {
