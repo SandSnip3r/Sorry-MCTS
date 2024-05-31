@@ -103,7 +103,13 @@ void SorryMcts::run(const Sorry &startingState, internal::LoopCondition *loopCon
     delete rootNode_;
   }
   rootNode_ = new Node;
+  int stepNum = 0;
   while (loopCondition->condition()) {
+    if (stepNum%100 == 0) {
+      // Every 1000 steps, yield, just in case someone else is waiting on the mutex.
+      std::this_thread::sleep_for(std::chrono::microseconds(10));
+    }
+    ++stepNum;
     doSingleStep(startingState, rootNode_);
     if (startingState.getActions().size() == 1) {
       // If there's only one option, we're done.
