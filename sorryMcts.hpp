@@ -36,6 +36,12 @@ private:
   std::atomic<bool> done_{false};
 };
 
+struct ActionScore {
+  sorry::Action action;
+  double score;
+  double averageMoveCount;
+};
+
 class SorryMcts {
 public:
   explicit SorryMcts(double explorationConstant);
@@ -43,7 +49,7 @@ public:
   void run(const sorry::Sorry &startingState, std::chrono::duration<double> timeLimit);
   void run(const sorry::Sorry &startingState, internal::LoopCondition *loopCondition);
   sorry::Action pickBestAction() const;
-  std::vector<std::pair<sorry::Action, double>> getActionsWithScores() const;
+  std::vector<ActionScore> getActionScores() const;
 private:
   const double explorationConstant_;
   std::mt19937 eng_{0};

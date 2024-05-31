@@ -3,9 +3,11 @@
 #include "sorryMcts.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <iostream>
 #include <limits>
 #include <numeric>
+#include <thread>
 
 class TimeLoopCondition : public internal::LoopCondition {
 public:
@@ -62,7 +64,7 @@ struct Node {
 
   double averageMoveCount() const {
     if (gameCount == 0) {
-      throw std::runtime_error("Cannot get average with 0 games");
+      return std::numeric_limits<double>::infinity();
     }
     return totalMoveCount / static_cast<double>(gameCount);
   }
@@ -131,7 +133,7 @@ sorry::Action SorryMcts::pickBestAction() const {
   return rootNode_->successors.at(index)->action;
 }
 
-std::vector<std::pair<sorry::Action, double>> SorryMcts::getActionsWithScores() const {
+std::vector<ActionScore> SorryMcts::getActionScores() const {
   std::unique_lock<std::mutex> lock(treeMutex_);
   if (rootNode_ == nullptr) {
     // No known actions yet.
@@ -139,19 +141,16 @@ std::vector<std::pair<sorry::Action, double>> SorryMcts::getActionsWithScores() 
   }
   std::vector<size_t> indices(rootNode_->successors.size());
   std::iota(indices.begin(), indices.end(), 0);
-  std::vector<double> scores;
   const auto [minAverageMoveCount, maxAverageMoveCount] = rootNode_->getMinAndMaxAverageMoveCountOfSuccessors(indices);
+  std::vector<ActionScore> result;
   for (size_t index : indices) {
     const Node *successor = rootNode_->successors.at(index);
     const double score = nodeScore(successor, rootNode_, maxAverageMoveCount, minAverageMoveCount, /*withExploration=*/false);
-    scores.push_back(score);
-  }
-  std::vector<std::pair<sorry::Action, double>> result;
-  for (size_t i=0; i<indices.size(); ++i) {
-    result.emplace_back(rootNode_->successors.at(i)->action, scores.at(i));
+    result.emplace_back(ActionScore{.action=successor->action,
+                                    .score=score,
+                                    .averageMoveCount=successor->averageMoveCount()});
   }
   return result;
-
 }
 
 void SorryMcts::doSingleStep(const Sorry &startingState, Node *rootNode) {
