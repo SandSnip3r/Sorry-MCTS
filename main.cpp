@@ -4,6 +4,7 @@
 #include "sorry.hpp"
 #include "sorryMcts.hpp"
 
+using namespace sorry;
 using namespace std;
 
 // =============Board layout=============
@@ -44,7 +45,7 @@ SorryMcts getSorryMcts() {
   // constexpr double explorationConstant_ = 200;
   // constexpr double explorationConstant_ = 300;
   // constexpr double explorationConstant_ = 400;
-  return {explorationConstant_};
+  return SorryMcts(explorationConstant_);
 }
 
 void doSingleMove() {
@@ -52,7 +53,8 @@ void doSingleMove() {
   s.setStartingCards({Card::kFour, Card::kTwelve, Card::kTwelve, Card::kTwelve, Card::kEleven});
   s.setStartingPositions({0,0,0,0});
   SorryMcts mcts = getSorryMcts();
-  Action bestAction = mcts.pickBestAction(s, 400000);
+  mcts.run(s, 400000);
+  Action bestAction = mcts.pickBestAction();
   cout << "For state " << s.toString() << " best action is " << bestAction.toString() << endl;
 }
 
@@ -61,20 +63,21 @@ int playFullGameMcts(mt19937 doActionEng) {
   Sorry state;
   state.drawRandomStartingCards(doActionEng);
   while (!state.gameDone()) {
-    // Action bestAction = mcts.pickBestAction(state, chrono::milliseconds(100));
-    // Action bestAction = mcts.pickBestAction(state, chrono::milliseconds(150));
-    // Action bestAction = mcts.pickBestAction(state, chrono::milliseconds(300));
-    // Action bestAction = mcts.pickBestAction(state, chrono::seconds(1));
-    // Action bestAction = mcts.pickBestAction(state, chrono::seconds(3));
-    // Action bestAction = mcts.pickBestAction(state, chrono::seconds(15));
-    // Action bestAction = mcts.pickBestAction(state, chrono::minutes(10));
+    // mcts.run(state, chrono::milliseconds(100));
+    // mcts.run(state, chrono::milliseconds(150));
+    // mcts.run(state, chrono::milliseconds(300));
+    // mcts.run(state, chrono::seconds(1));
+    // mcts.run(state, chrono::seconds(3));
+    // mcts.run(state, chrono::seconds(15));
+    // mcts.run(state, chrono::minutes(10));
 
-    // Action bestAction = mcts.pickBestAction(state, 10);
-    Action bestAction = mcts.pickBestAction(state, 100);
-    // Action bestAction = mcts.pickBestAction(state, 1000);
-    // Action bestAction = mcts.pickBestAction(state, 10000);
-    // Action bestAction = mcts.pickBestAction(state, 100000);
-    // Action bestAction = mcts.pickBestAction(state, 1000000);
+    // mcts.run(state, 10);
+    // mcts.run(state, 100);
+    mcts.run(state, 1000);
+    // mcts.run(state, 10000);
+    // mcts.run(state, 100000);
+    // mcts.run(state, 1000000);
+    Action bestAction = mcts.pickBestAction();
     state.doAction(bestAction, doActionEng);
   }
   return state.getTotalActionCount();
