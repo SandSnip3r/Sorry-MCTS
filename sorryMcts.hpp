@@ -50,12 +50,14 @@ public:
   void run(const sorry::Sorry &startingState, internal::LoopCondition *loopCondition);
   sorry::Action pickBestAction() const;
   std::vector<ActionScore> getActionScores() const;
+  int getIterationCount() const;
 private:
   const double explorationConstant_;
   std::mt19937 eng_{0};
 
   mutable std::mutex treeMutex_;
   Node *rootNode_{nullptr};
+  int iterationCount_;
   void doSingleStep(const sorry::Sorry &startingState, Node *rootNode);
   int select(const Node *currentNode, bool withExploration, const std::vector<size_t> &indices) const;
   int rollout(sorry::Sorry state);

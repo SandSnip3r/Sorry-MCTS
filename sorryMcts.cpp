@@ -101,18 +101,28 @@ void SorryMcts::run(const Sorry &startingState, std::chrono::duration<double> ti
 }
 
 void SorryMcts::run(const Sorry &startingState, internal::LoopCondition *loopCondition) {
-  if (rootNode_ != nullptr) {
-    delete rootNode_;
+  {
+    std::unique_lock lock(treeMutex_);
+    if (rootNode_ != nullptr) {
+      delete rootNode_;
+    }
+    rootNode_ = new Node;
+    iterationCount_ = 0;
   }
-  rootNode_ = new Node;
-  int stepNum = 0;
+  if (startingState.getActions().size() == 0) {
+    // No actions, must be done with the game.
+    return;
+  }
   while (loopCondition->condition()) {
-    if (stepNum%100 == 0) {
-      // Every 1000 steps, yield, just in case someone else is waiting on the mutex.
+    if (iterationCount_%100 == 0) {
+      // Every few steps, yield, just in case someone else is waiting on the mutex.
       std::this_thread::sleep_for(std::chrono::microseconds(10));
     }
-    ++stepNum;
-    doSingleStep(startingState, rootNode_);
+    {
+      std::unique_lock lock(treeMutex_);
+      doSingleStep(startingState, rootNode_);
+    }
+    ++iterationCount_;
     if (startingState.getActions().size() == 1) {
       // If there's only one option, we're done.
       return;
@@ -134,7 +144,7 @@ sorry::Action SorryMcts::pickBestAction() const {
 }
 
 std::vector<ActionScore> SorryMcts::getActionScores() const {
-  std::unique_lock<std::mutex> lock(treeMutex_);
+  std::unique_lock lock(treeMutex_);
   if (rootNode_ == nullptr) {
     // No known actions yet.
     return {};
@@ -153,9 +163,13 @@ std::vector<ActionScore> SorryMcts::getActionScores() const {
   return result;
 }
 
+int SorryMcts::getIterationCount() const {
+  std::unique_lock lock(treeMutex_);
+  return iterationCount_;
+}
+
 void SorryMcts::doSingleStep(const Sorry &startingState, Node *rootNode) {
   Sorry state = startingState;
-  std::unique_lock<std::mutex> lock(treeMutex_);
   Node *currentNode = rootNode;
   while (!state.gameDone()) {
     // Get all actions.
@@ -241,7 +255,13 @@ void SorryMcts::backprop(Node *current, int moveCount) {
 }
 
 double SorryMcts::nodeScore(const Node *current, const Node *parent, double maxAverageMoveCount, double minAverageMoveCount, bool withExploration) const {
-  double score = 1 - (current->averageMoveCount() - minAverageMoveCount) / (maxAverageMoveCount - minAverageMoveCount);
+  double range = maxAverageMoveCount - minAverageMoveCount;
+  double score;
+  if (range == 0) {
+    score = 1;
+  } else {
+    score = 1 - (current->averageMoveCount() - minAverageMoveCount) / range;
+  }
   if (!withExploration) {
     return score;
   }
