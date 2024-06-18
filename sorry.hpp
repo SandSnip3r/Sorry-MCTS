@@ -3,60 +3,92 @@
 
 #include "action.hpp"
 #include "card.hpp"
+#include "deck.hpp"
 
 #include <array>
 #include <optional>
 #include <random>
+#include <sstream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace sorry {
 
-class Deck {
-public:
-  void initialize();
-  void removeSpecificCard(Card card);
-  Card drawRandomCard(std::mt19937 &eng);
-  size_t size() const;
-  bool empty() const;
-private:
-  using CardsType = std::array<Card, 45>;
-  CardsType cards_;
-  size_t size_{0};
-  void removeCard(CardsType::iterator it);
+// Singleton class for the rules of the game.
+struct SorryRules {
+  bool sorryCanMoveForward4{true};
+  bool twoGetsAnotherTurn{true};
+  bool startWithOnePieceOutOfStart{true};
 
-  friend bool operator==(const Deck &lhs, const Deck &rhs);
+  // The game is slightly different depending on the order of discard & shuffle. If false, shuffle first then discard.
+  bool shuffleAfterDiscard{true};
+  static SorryRules& instance() {
+    static SorryRules rules;
+    return rules;
+  }
+private:
+  SorryRules() {}
 };
 
 class Sorry {
 public:
-  Sorry();
+  Sorry(const std::vector<PlayerColor> &playerColors);
+  Sorry(std::initializer_list<PlayerColor> playerColors);
   void drawRandomStartingCards(std::mt19937 &eng);
-  void setStartingCards(std::array<Card,5> cards);
-  void setStartingPositions(const std::array<int, 4> &positions);
+  void setStartingCards(PlayerColor playerColor, const std::array<Card,5> &cards);
+  void setStartingPositions(PlayerColor playerColor, const std::array<int, 4> &positions);
+  void setTurn(PlayerColor playerColor);
+
   std::string toString() const;
   std::string handToString() const;
+
+  std::vector<PlayerColor> getPlayers() const;
+  PlayerColor getPlayerTurn() const;
+  std::array<Card,5> getHandForPlayer(PlayerColor playerColor) const;
+  std::array<int, 4> getPiecePositionsForPlayer(PlayerColor playerColor) const;
   std::vector<Action> getActions() const;
+
+  struct Move {
+    PlayerColor playerColor;
+    int pieceIndex;
+    int srcPosition;
+    int destPosition;
+  };
+  std::vector<Move> getMovesForAction(const Action &action) const;
+
   void doAction(const Action &action, std::mt19937 &eng);
+
   bool gameDone() const;
-  int getTotalActionCount() const;
-  std::array<Card,5> getHand() const;
-  std::array<int, 4> getPiecePositions() const;
+  PlayerColor getWinner() const;
 
 private:
+  Sorry(const PlayerColor *playerColors, size_t playerCount);
+  struct Player {
+    PlayerColor playerColor;
+    std::array<Card,5> hand;
+    std::array<int, 4> piecePositions;
+    size_t indexOfCardInHand(Card card) const;
+    std::string toString() const;
+  };
+  std::vector<Player> players_;
+  bool haveStartingHands_{false};
+  int currentPlayerIndex_;
   Deck deck_;
-  std::array<Card,5> hand_;
-  bool haveStartingHand_{false};
-  std::array<int, 4> piecePositions_ = {2,0,0,0}; // Always start the game with one piece just outside of Start.
-  int actionCount_{0};
-  void drawRandomCardIntoIndex(int index, std::mt19937 &eng);
-  void addActionsForCard(Card card, std::vector<Action> &actions) const;
-  std::optional<int> getMoveResultingPos(int pieceIndex, int moveDistance) const;
-  std::optional<std::pair<int,int>> getDoubleMoveResultingPos(int piece1Index, int move1Distance, int piece2Index, int move2Distance) const;
-  int slideLengthAtPos(int pos) const;
-  int posAfterSlide(int pos) const;
-  size_t indexOfCardInHand(Card card) const;
+  void addActionsForCard(const Player &player, Card card, std::vector<Action> &actions) const;
+  std::optional<int> getMoveResultingPos(const Player &player, int pieceIndex, int moveDistance) const;
+  std::optional<std::pair<int,int>> getDoubleMoveResultingPos(const Player &player, int piece1Index, int move1Distance, int piece2Index, int move2Distance) const;
+  int slideLengthAtPos(PlayerColor playerColor, int pos) const;
+  int posAfterSlide(PlayerColor playerColor, int pos) const;
+  int getNextPlayerIndex(int currentIndex) const;
+  Player& currentPlayer();
+  const Player& currentPlayer() const;
+  Player& getPlayer(PlayerColor player);
+  const Player& getPlayer(PlayerColor player) const;
+  int posAfterMoveForPlayer(PlayerColor playerColor, int startingPosition, int moveDistance) const;
+  int getFirstPosition(PlayerColor playerColor) const;
+  static bool playerIsDone(const Player &player);
 
   friend bool operator==(const Sorry &lhs, const Sorry &rhs);
 };

@@ -16,7 +16,9 @@ set(SRC_FILES
   action.cpp
   card.cpp
   common.cpp
+  deck.cpp
   main.cpp
+  playerColor.cpp
   sorry.cpp
   sorryMcts.cpp
 )
@@ -26,6 +28,8 @@ set(INC_FILES
   action.hpp
   card.hpp
   common.hpp
+  deck.hpp
+  playerColor.hpp
   sorry.hpp
   sorryMcts.hpp
 )

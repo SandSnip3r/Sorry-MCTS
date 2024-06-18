@@ -39,7 +39,6 @@ private:
 struct ActionScore {
   sorry::Action action;
   double score;
-  double averageMoveCount;
 };
 
 class SorryMcts {
@@ -48,21 +47,27 @@ public:
   void run(const sorry::Sorry &startingState, int rolloutCount);
   void run(const sorry::Sorry &startingState, std::chrono::duration<double> timeLimit);
   void run(const sorry::Sorry &startingState, internal::LoopCondition *loopCondition);
+  void reset();
   sorry::Action pickBestAction() const;
   std::vector<ActionScore> getActionScores() const;
+  std::vector<double> getWinRates() const;
   int getIterationCount() const;
 private:
   const double explorationConstant_;
   std::mt19937 eng_{0};
+  sorry::PlayerColor ourPlayer_;
 
   mutable std::mutex treeMutex_;
   Node *rootNode_{nullptr};
   int iterationCount_;
-  void doSingleStep(const sorry::Sorry &startingState, Node *rootNode);
+  void doSingleStep(const sorry::Sorry &startingState);
+
+  // Returns the index of the action to take. This is one of the indices in the `indices` vector.
   int select(const Node *currentNode, bool withExploration, const std::vector<size_t> &indices) const;
-  int rollout(sorry::Sorry state);
-  void backprop(Node *current, int moveCount);
-  double nodeScore(const Node *current, const Node *parent, double maxAverageMoveCount, double minAverageMoveCount, bool withExploration) const;
+
+  sorry::PlayerColor rollout(sorry::Sorry state);
+  void backprop(Node *current, sorry::PlayerColor winner);
+  double nodeScore(const Node *current, const Node *parent, bool withExploration) const;
   void printActions(const Node *current, int levels, int currentLevel=0) const;
 };
 

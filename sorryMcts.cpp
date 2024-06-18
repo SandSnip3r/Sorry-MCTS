@@ -48,7 +48,7 @@ void ExplicitTerminator::oneIterationComplete() {}
 using namespace sorry;
 
 struct Node {
-  Node() = default;
+  explicit Node(const Sorry &s) : state(s) {}
   Node(const Sorry &s, const Action &a, Node *p) : state(s), action(a), parent(p) {}
   ~Node() {
     for (Node *successor : successors) {
@@ -59,30 +59,14 @@ struct Node {
   Action action;
   Node *parent{nullptr};
   std::vector<Node*> successors;
-  int totalMoveCount{0};
-  int gameCount{0};
+  std::array<int, 4> winCount = {0,0,0,0};
+  int gameCount{0}; // TODO: Maybe can be removed
 
-  double averageMoveCount() const {
+  double score() const {
     if (gameCount == 0) {
-      return std::numeric_limits<double>::infinity();
+      throw std::runtime_error("Cannot get score of node with no games");
     }
-    return totalMoveCount / static_cast<double>(gameCount);
-  }
-
-  std::pair<double, double> getMinAndMaxAverageMoveCountOfSuccessors(const std::vector<size_t> &indices) const {
-    double minAverageMoveCount = std::numeric_limits<double>::max();
-    double maxAverageMoveCount = 0;
-    for (size_t index : indices) {
-      const Node *successor = successors.at(index);
-      const double average = successor->averageMoveCount();
-      if (average < minAverageMoveCount) {
-        minAverageMoveCount = average;
-      }
-      if (average > maxAverageMoveCount) {
-        maxAverageMoveCount = average;
-      }
-    }
-    return {minAverageMoveCount, maxAverageMoveCount};
+    return winCount.at(static_cast<int>(action.playerColor)) / static_cast<double>(gameCount);
   }
 };
 
@@ -101,12 +85,14 @@ void SorryMcts::run(const Sorry &startingState, std::chrono::duration<double> ti
 }
 
 void SorryMcts::run(const Sorry &startingState, internal::LoopCondition *loopCondition) {
+  // Since we've been invoked, we know that we are the current player.
+  ourPlayer_ = startingState.getPlayerTurn();
   {
     std::unique_lock lock(treeMutex_);
     if (rootNode_ != nullptr) {
       delete rootNode_;
     }
-    rootNode_ = new Node;
+    rootNode_ = new Node(startingState);
     iterationCount_ = 0;
   }
   if (startingState.getActions().size() == 0) {
@@ -114,20 +100,21 @@ void SorryMcts::run(const Sorry &startingState, internal::LoopCondition *loopCon
     return;
   }
   while (loopCondition->condition()) {
-    if (iterationCount_%100 == 0) {
-      // Every few steps, yield, just in case someone else is waiting on the mutex.
-      std::this_thread::sleep_for(std::chrono::microseconds(10));
-    }
-    {
-      std::unique_lock lock(treeMutex_);
-      doSingleStep(startingState, rootNode_);
-    }
+    doSingleStep(startingState);
     ++iterationCount_;
     if (startingState.getActions().size() == 1) {
       // If there's only one option, we're done.
       return;
     }
     loopCondition->oneIterationComplete();
+  }
+}
+
+void SorryMcts::reset() {
+  std::unique_lock lock(treeMutex_);
+  if (rootNode_ != nullptr) {
+    delete rootNode_;
+    rootNode_ = nullptr;
   }
 }
 
@@ -151,26 +138,41 @@ std::vector<ActionScore> SorryMcts::getActionScores() const {
   }
   std::vector<size_t> indices(rootNode_->successors.size());
   std::iota(indices.begin(), indices.end(), 0);
-  const auto [minAverageMoveCount, maxAverageMoveCount] = rootNode_->getMinAndMaxAverageMoveCountOfSuccessors(indices);
   std::vector<ActionScore> result;
   for (size_t index : indices) {
     const Node *successor = rootNode_->successors.at(index);
-    const double score = nodeScore(successor, rootNode_, maxAverageMoveCount, minAverageMoveCount, /*withExploration=*/false);
+    const double score = nodeScore(successor, rootNode_, /*withExploration=*/false);
     result.emplace_back(ActionScore{.action=successor->action,
-                                    .score=score,
-                                    .averageMoveCount=successor->averageMoveCount()});
+                                    .score=score});
   }
   return result;
 }
+
+std::vector<double> SorryMcts::getWinRates() const {
+  std::unique_lock lock(treeMutex_);
+  if (rootNode_ == nullptr) {
+    return { 0.25, 0.25, 0.25, 0.25 };
+  }
+  const double sum = rootNode_->winCount[0] + rootNode_->winCount[1] + rootNode_->winCount[2] + rootNode_->winCount[3];
+  if (sum == 0) {
+    return { 0.25, 0.25, 0.25, 0.25 };
+  }
+  return { rootNode_->winCount[0] / sum,
+           rootNode_->winCount[1] / sum,
+           rootNode_->winCount[2] / sum,
+           rootNode_->winCount[3] / sum };
+};
+
 
 int SorryMcts::getIterationCount() const {
   std::unique_lock lock(treeMutex_);
   return iterationCount_;
 }
 
-void SorryMcts::doSingleStep(const Sorry &startingState, Node *rootNode) {
+void SorryMcts::doSingleStep(const Sorry &startingState) {
   Sorry state = startingState;
-  Node *currentNode = rootNode;
+  std::unique_lock lock(treeMutex_);
+  Node *currentNode = rootNode_;
   while (!state.gameDone()) {
     // Get all actions.
     const auto actions = state.getActions();
@@ -192,12 +194,17 @@ void SorryMcts::doSingleStep(const Sorry &startingState, Node *rootNode) {
         // Already have a child for this action.
         continue;
       }
-      // Never visited this node, expand to it then rollout.
+      // Never tried this action. Create a node for it and then rollout.
       currentNode->successors.push_back(new Node(state, action, currentNode));
       state.doAction(action, eng_);
-      int result = rollout(state);
+
+      // Unlock the mutex protecting the root node during rollout.
+      lock.unlock();
+      const sorry::PlayerColor winner = rollout(state);
+      lock.lock();
+
       // Propagate the result of the rollout back up through the parents.
-      backprop(currentNode->successors.back(), result);
+      backprop(currentNode->successors.back(), winner);
       rolledOut = true;
       break;
     }
@@ -209,7 +216,8 @@ void SorryMcts::doSingleStep(const Sorry &startingState, Node *rootNode) {
     currentNode = currentNode->successors.at(index);
     state.doAction(currentNode->action, eng_);
   }
-  backprop(currentNode, state.getTotalActionCount());
+  // Game is done.
+  backprop(currentNode, state.getWinner());
 }
 
 int SorryMcts::select(const Node *currentNode, bool withExploration, const std::vector<size_t> &indices) const {
@@ -217,18 +225,16 @@ int SorryMcts::select(const Node *currentNode, bool withExploration, const std::
     return indices.at(0);
   }
   std::vector<double> scores;
-  const auto [minAverageMoveCount, maxAverageMoveCount] = currentNode->getMinAndMaxAverageMoveCountOfSuccessors(indices);
   for (size_t index : indices) {
     const Node *successor = currentNode->successors.at(index);
-    const double score = nodeScore(successor, currentNode, maxAverageMoveCount, minAverageMoveCount, withExploration);
+    const double score = nodeScore(successor, currentNode, withExploration);
     scores.push_back(score);
   }
   auto it = std::max_element(scores.begin(), scores.end());
   return indices.at(distance(scores.begin(), it));
 }
 
-int SorryMcts::rollout(Sorry state) {
-  int count=0;
+sorry::PlayerColor SorryMcts::rollout(Sorry state) {
   while (!state.gameDone()) {
     const auto actions = state.getActions();
     if (actions.empty()) {
@@ -237,31 +243,28 @@ int SorryMcts::rollout(Sorry state) {
     std::uniform_int_distribution<int> dist(0, actions.size()-1);
     const auto action = actions[dist(eng_)];
     state.doAction(action, eng_);
-    ++count;
   }
-  // Game is over, return the number of actions taken to reach this point.
-  return state.getTotalActionCount();
+  // Game is over.
+  return state.getWinner();
 }
 
-void SorryMcts::backprop(Node *current, int moveCount) {
+void SorryMcts::backprop(Node *current, sorry::PlayerColor winner) {
   while (1) {
-    current->totalMoveCount += moveCount;
+    ++current->winCount[static_cast<int>(winner)];
     ++current->gameCount;
     if (current->parent == nullptr) {
+      // Reached the root. We're done.
       break;
     }
     current = current->parent;
   }
 }
 
-double SorryMcts::nodeScore(const Node *current, const Node *parent, double maxAverageMoveCount, double minAverageMoveCount, bool withExploration) const {
-  double range = maxAverageMoveCount - minAverageMoveCount;
-  double score;
-  if (range == 0) {
-    score = 1;
-  } else {
-    score = 1 - (current->averageMoveCount() - minAverageMoveCount) / range;
+double SorryMcts::nodeScore(const Node *current, const Node *parent, bool withExploration) const {
+  if (current->gameCount == 0) {
+    return 0;
   }
+  const double score = current->score();
   if (!withExploration) {
     return score;
   }
@@ -269,15 +272,14 @@ double SorryMcts::nodeScore(const Node *current, const Node *parent, double maxA
 }
 
 void SorryMcts::printActions(const Node *current, int levels, int currentLevel) const {
-  if (currentLevel == levels) {
-    return;
-  }
-  std::vector<size_t> indices(current->successors.size());
-  std::iota(indices.begin(), indices.end(), 0);
-  const auto [minAverageMoveCount, maxAverageMoveCount] = current->getMinAndMaxAverageMoveCountOfSuccessors(indices);
-  for (const Node *successor : current->successors) {
-    const double score = nodeScore(successor, current, maxAverageMoveCount, minAverageMoveCount, /*withExploration=*/false);
-    printf("%s[%7.5f] Action %27s average %5.2f moves, count: %5d, parent count: %6d\n", std::string(currentLevel*2, ' ').c_str(), score, successor->action.toString().c_str(), successor->averageMoveCount(), successor->gameCount, current->gameCount);
-    printActions(successor, levels, currentLevel+1);
-  }
+  // if (currentLevel == levels) {
+  //   return;
+  // }
+  // std::vector<size_t> indices(current->successors.size());
+  // std::iota(indices.begin(), indices.end(), 0);
+  // for (const Node *successor : current->successors) {
+  //   const double score = nodeScore(successor, current, /*withExploration=*/false);
+  //   printf("%s[%7.5f] Action %27s average %5.2f moves, count: %5d, parent count: %6d\n", std::string(currentLevel*2, ' ').c_str(), score, successor->action.toString().c_str(), successor->averageMoveCount(), successor->gameCount, current->gameCount);
+  //   printActions(successor, levels, currentLevel+1);
+  // }
 }
