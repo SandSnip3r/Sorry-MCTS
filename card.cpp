@@ -38,6 +38,9 @@ std::string toString(Card c) {
   if (c == Card::kSorry) {
     return "Sorry";
   }
+  if (c == Card::kUnknown) {
+    return "?";
+  }
   throw std::runtime_error("Invalid card toString");
 }
 

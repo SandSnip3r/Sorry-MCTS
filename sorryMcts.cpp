@@ -241,7 +241,7 @@ sorry::PlayerColor SorryMcts::rollout(Sorry state) {
       throw std::runtime_error("No actions to take");
     }
     std::uniform_int_distribution<int> dist(0, actions.size()-1);
-    const auto action = actions[dist(eng_)];
+    const auto &action = actions.at(dist(eng_));
     state.doAction(action, eng_);
   }
   // Game is over.
