@@ -106,7 +106,25 @@ std::string Sorry::toString() const {
   ss << '{';
   ss << "Deck:" << deck_.size();
   for (const auto &player : players_) {
-    ss << ',' << player.toString();
+    ss << ',' << player.toString(/*showHand=*/true);
+  }
+  ss << '}';
+  return ss.str();
+}
+
+std::string Sorry::toStringForCurrentPlayer() const {
+  if (!haveStartingHands_) {
+    throw std::runtime_error("Called toString() without starting hands set");
+  }
+  std::stringstream ss;
+  ss << '{';
+  ss << "Deck:" << deck_.size();
+  for (const auto &player : players_) {
+    if (player.playerColor == getPlayerTurn()) {
+      ss << ',' << player.toString(/*showHand=*/true);
+    } else {
+      ss << ',' << player.toString(/*showHand=*/false);
+    }
   }
   ss << '}';
   return ss.str();
@@ -189,6 +207,10 @@ std::vector<Action> Sorry::getActions() const {
     }
   }
   return result;
+}
+
+int Sorry::getFaceDownCardsCount() const {
+  return deck_.size();
 }
 
 std::vector<Sorry::Move> Sorry::getMovesForAction(const Action &action) const {
@@ -865,11 +887,12 @@ size_t Sorry::Player::indexOfCardInHand(Card card) const {
   throw std::runtime_error("Card "+sorry::toString(card)+" not in hand");
 }
 
-std::string Sorry::Player::toString() const {
+std::string Sorry::Player::toString(bool showHand) const {
   std::stringstream ss;
   ss << '(' << sorry::toString(playerColor) << ':';
   for (size_t i=0; i<hand.size(); ++i) {
-    ss << sorry::toString(hand[i]);
+    const Card card = showHand ? hand[i] : Card::kUnknown;
+    ss << sorry::toString(card);
     if (i != hand.size()-1) {
       ss << ',';
     }

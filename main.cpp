@@ -65,7 +65,7 @@ class HumanAgent : public BaseAgent {
 public:
   HumanAgent() = default;
   sorry::Action getAction(const sorry::Sorry &state) override {
-    cout << "State: " << state.toString() << endl;
+    cout << "State: " << state.toStringForCurrentPlayer() << endl;
     const auto actions = state.getActions();
     for (size_t i=0; i<actions.size(); ++i) {
       cout << "  " << i << ": " << actions.at(i).toString() << endl;

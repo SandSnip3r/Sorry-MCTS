@@ -42,6 +42,7 @@ public:
   void setTurn(PlayerColor playerColor);
 
   std::string toString() const;
+  std::string toStringForCurrentPlayer() const;
   std::string handToString() const;
 
   std::vector<PlayerColor> getPlayers() const;
@@ -49,6 +50,7 @@ public:
   std::array<Card,5> getHandForPlayer(PlayerColor playerColor) const;
   std::array<int, 4> getPiecePositionsForPlayer(PlayerColor playerColor) const;
   std::vector<Action> getActions() const;
+  int getFaceDownCardsCount() const;
 
   struct Move {
     PlayerColor playerColor;
@@ -70,7 +72,7 @@ private:
     std::array<Card,5> hand;
     std::array<int, 4> piecePositions;
     size_t indexOfCardInHand(Card card) const;
-    std::string toString() const;
+    std::string toString(bool showHand) const;
   };
   std::vector<Player> players_;
   bool haveStartingHands_{false};
