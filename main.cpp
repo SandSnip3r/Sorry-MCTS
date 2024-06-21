@@ -120,7 +120,7 @@ void doSingleMove() {
 
 int main() {
   HumanAgent agent1;
-  RandomAgent agent2;
+  IterationBoundMctsAgent agent2(0.65, 10000);
   std::map<sorry::PlayerColor, BaseAgent*> agents = {{sorry::PlayerColor::kGreen, &agent1},
                                                      {sorry::PlayerColor::kBlue, &agent2}};
   const sorry::PlayerColor winner = agentVsAgent(agents);

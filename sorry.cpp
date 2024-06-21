@@ -98,6 +98,33 @@ void Sorry::setTurn(PlayerColor playerColor) {
   }
 }
 
+void Sorry::giveOpponentsRandomHands(std::mt19937 &eng) {
+  Deck tmpDeck = deck_;
+  const auto &selfPlayer = currentPlayer();
+  // Discard all of our cards.
+  for (Card card : selfPlayer.hand) {
+    tmpDeck.discard(card);
+  }
+  // Draw cards for opponents from both the facedown cards and the "out" cards (which now does not include our cards). This effectively gives each opponent a random hand from the possibilities
+  for (Player &player : players_) {
+    if (player.playerColor == selfPlayer.playerColor) {
+      continue;
+    }
+    for (size_t i=0; i<player.hand.size(); ++i) {
+      Card card = tmpDeck.drawRandomCardAlsoFromOut(eng);
+      player.hand.at(i) = card;
+    }
+  }
+
+  Deck newDeck;
+  for (const Player &player : players_) {
+    for (size_t i=0; i<player.hand.size(); ++i) {
+      newDeck.removeSpecificCard(player.hand.at(i));
+    }
+  }
+  deck_ = newDeck;
+}
+
 std::string Sorry::toString() const {
   if (!haveStartingHands_) {
     throw std::runtime_error("Called toString() without starting hands set");
@@ -857,16 +884,19 @@ bool operator==(const sorry::Sorry &lhs, const sorry::Sorry &rhs) {
   if (lhs.players_.size() != rhs.players_.size()) {
     return false;
   }
-  if (!(lhs.deck_ == rhs.deck_)) {
+  if (!lhs.deck_.equalDiscarded(rhs.deck_)) {
     return false;
   }
   for (size_t playerIndex=0; playerIndex<lhs.players_.size(); ++playerIndex) {
     const sorry::Sorry::Player &lhsPlayer = lhs.players_.at(playerIndex);
     const sorry::Sorry::Player &rhsPlayer = rhs.players_.at(playerIndex);
+    std::set<Card> lhsCards, rhsCards;
     for (size_t i=0; i<lhsPlayer.hand.size(); ++i) {
-      if (lhsPlayer.hand[i] != rhsPlayer.hand[i]) {
-        return false;
-      }
+      lhsCards.insert(lhsPlayer.hand[i]);
+      rhsCards.insert(rhsPlayer.hand[i]);
+    }
+    if (lhsCards != rhsCards) {
+      return false;
     }
     for (size_t i=0; i<lhsPlayer.piecePositions.size(); ++i) {
       if (lhsPlayer.piecePositions[i] != rhsPlayer.piecePositions[i]) {

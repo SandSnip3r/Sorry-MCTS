@@ -40,6 +40,7 @@ public:
   void setStartingCards(PlayerColor playerColor, const std::array<Card,5> &cards);
   void setStartingPositions(PlayerColor playerColor, const std::array<int, 4> &positions);
   void setTurn(PlayerColor playerColor);
+  void giveOpponentsRandomHands(std::mt19937 &eng);
 
   std::string toString() const;
   std::string toStringForCurrentPlayer() const;

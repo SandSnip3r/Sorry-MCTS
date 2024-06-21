@@ -18,6 +18,8 @@ public:
   size_t size() const;
   bool empty() const;
   void shuffle();
+
+  bool equalDiscarded(const Deck &other) const;
 private:
   std::array<Card, 45> cards_;
   size_t firstOutIndex_;
@@ -25,7 +27,8 @@ private:
   void removeCard(size_t index);
   void print() const;
 
-  friend bool operator==(const Deck &lhs, const Deck &rhs);
+  friend class Sorry;
+  Card drawRandomCardAlsoFromOut(std::mt19937 &eng);
 };
 
 } // namespace sorry

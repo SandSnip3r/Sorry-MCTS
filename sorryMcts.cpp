@@ -124,6 +124,7 @@ sorry::Action SorryMcts::pickBestAction() const {
   }
   // TODO: The below code assumes that all possible actions have been visited once.
   std::vector<size_t> indices(rootNode_->successors.size());
+  std::cout << "Choosing action from " << rootNode_->successors.size() << " actions" << std::endl;
   std::iota(indices.begin(), indices.end(), 0);
   int index = select(rootNode_, /*withExploration=*/false, indices);
   // printActions(rootNode_, 2);
@@ -153,14 +154,21 @@ std::vector<double> SorryMcts::getWinRates() const {
   if (rootNode_ == nullptr) {
     return { 0.25, 0.25, 0.25, 0.25 };
   }
-  const double sum = rootNode_->winCount[0] + rootNode_->winCount[1] + rootNode_->winCount[2] + rootNode_->winCount[3];
+  if (rootNode_->successors.empty()) {
+    return { 0.25, 0.25, 0.25, 0.25 };
+  }
+  std::vector<size_t> indices(rootNode_->successors.size());
+  std::iota(indices.begin(), indices.end(), 0);
+  const int indexOfPreferredAction = select(rootNode_, false, indices);
+  Node *preferredAction = rootNode_->successors.at(indexOfPreferredAction);
+  const double sum = preferredAction->winCount[0] + preferredAction->winCount[1] + preferredAction->winCount[2] + preferredAction->winCount[3];
   if (sum == 0) {
     return { 0.25, 0.25, 0.25, 0.25 };
   }
-  return { rootNode_->winCount[0] / sum,
-           rootNode_->winCount[1] / sum,
-           rootNode_->winCount[2] / sum,
-           rootNode_->winCount[3] / sum };
+  return { preferredAction->winCount[0] / sum,
+           preferredAction->winCount[1] / sum,
+           preferredAction->winCount[2] / sum,
+           preferredAction->winCount[3] / sum };
 };
 
 
@@ -171,6 +179,7 @@ int SorryMcts::getIterationCount() const {
 
 void SorryMcts::doSingleStep(const Sorry &startingState) {
   Sorry state = startingState;
+  state.giveOpponentsRandomHands(eng_);
   std::unique_lock lock(treeMutex_);
   Node *currentNode = rootNode_;
   while (!state.gameDone()) {
