@@ -56,6 +56,7 @@ public:
     mcts_.reset();
     return action;
   }
+  SorryMcts& getMcts() { return mcts_; }
 private:
   SorryMcts mcts_;
   int maxIterationCount_;
@@ -80,26 +81,35 @@ public:
 private:
 };
 
-sorry::PlayerColor agentVsAgent(const std::map<sorry::PlayerColor, BaseAgent*> &agents) {
-  mt19937 eng = createRandomEngine();
-  std::vector<sorry::PlayerColor> playerColors;
-  playerColors.reserve(agents.size());
-  for (const auto &colorAndAgent : agents) {
-    playerColors.push_back(colorAndAgent.first);
-  }
-  Sorry sorry(playerColors);
-  sorry.drawRandomStartingCards(eng);
+std::pair<bool, bool> agentVsAgent(BaseAgent &player1, BaseAgent &player2) {
+  mt19937 firstGameEng = createRandomEngine();
+  mt19937 secondGameEng = firstGameEng;
 
-  int turnNumber=0;
-  while (!sorry.gameDone()) {
+  Sorry firstSorryGameState({sorry::PlayerColor::kGreen, sorry::PlayerColor::kBlue});
+  firstSorryGameState.drawRandomStartingCards(firstGameEng);
+  Sorry secondSorryGameState = firstSorryGameState;
+
+  while (!firstSorryGameState.gameDone()) {
     // Who's turn?
-    const PlayerColor currentTurn = sorry.getPlayerTurn();
-    BaseAgent *agent = agents.at(currentTurn);
-    const sorry::Action action = agent->getAction(sorry);
-    sorry.doAction(action, eng);
-    ++turnNumber;
+    const PlayerColor currentTurn = firstSorryGameState.getPlayerTurn();
+    // In the first game, player 1 goes first (is green).
+    BaseAgent &currentPlayer = (currentTurn == sorry::PlayerColor::kGreen ? player1 : player2);
+    const sorry::Action action = currentPlayer.getAction(firstSorryGameState);
+    firstSorryGameState.doAction(action, firstGameEng);
   }
-  return sorry.getWinner();
+
+  while (!secondSorryGameState.gameDone()) {
+    // Who's turn?
+    const PlayerColor currentTurn = secondSorryGameState.getPlayerTurn();
+    // In the second game, player 2 goes first (is green).
+    BaseAgent &currentPlayer = (currentTurn == sorry::PlayerColor::kGreen ? player2 : player1);
+    const sorry::Action action = currentPlayer.getAction(secondSorryGameState);
+    secondSorryGameState.doAction(action, secondGameEng);
+  }
+
+  std::cout << sorry::toString(firstSorryGameState.getWinner()) << " & " << sorry::toString(secondSorryGameState.getWinner()) << std::endl;
+  return { (firstSorryGameState.getWinner() == sorry::PlayerColor::kGreen),
+           (secondSorryGameState.getWinner() == sorry::PlayerColor::kBlue) };
 }
 
 void doSingleMove() {
@@ -119,11 +129,23 @@ void doSingleMove() {
 }
 
 int main() {
-  HumanAgent agent1;
-  IterationBoundMctsAgent agent2(0.65, 10000);
-  std::map<sorry::PlayerColor, BaseAgent*> agents = {{sorry::PlayerColor::kGreen, &agent1},
-                                                     {sorry::PlayerColor::kBlue, &agent2}};
-  const sorry::PlayerColor winner = agentVsAgent(agents);
-  std::cout << toString(winner) << " won" << std::endl;
+  // HumanAgent agent1;
+  IterationBoundMctsAgent agent1(0.65, 1000);
+  IterationBoundMctsAgent agent2(0.65, 500);
+  std::array<int, 2> winCount = { 0,0 };
+  for (int i=0; i<10000; ++i) {
+    const auto [agent1WonFirstGame, agent1WonSecondGame] = agentVsAgent(agent1, agent2);
+    if (agent1WonFirstGame) {
+      ++winCount[0];
+    } else {
+      ++winCount[1];
+    }
+    if (agent1WonSecondGame) {
+      ++winCount[0];
+    } else {
+      ++winCount[1];
+    }
+    std::cout << "Player 1: " << winCount[0] << ", player 2: " << winCount[1] << std::endl;
+  }
   return 0;
 }

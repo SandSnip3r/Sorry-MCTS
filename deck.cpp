@@ -49,6 +49,13 @@ void Deck::discard(Card card) {
       // Found our card, move it to the discard pile.
       std::swap(cards_.at(i), cards_.at(firstDiscardIndex_-1));
       --firstDiscardIndex_;
+
+      // Bubble-up card so that discarded cards remain sorted
+      size_t tmpIndex = firstDiscardIndex_;
+      while (tmpIndex < cards_.size()-1 && cards_[tmpIndex] > cards_[tmpIndex+1]) {
+        std::swap(cards_[tmpIndex], cards_[tmpIndex+1]);
+        ++tmpIndex;
+      }
       return;
     }
   }
@@ -84,7 +91,10 @@ void Deck::print() const {
   }
   int i1 = (firstOutIndex_-1) * 3 + 2;
   int i2 = (firstDiscardIndex_-1) * 3 + 2;
-  std::cout << '\n' << std::string(i1, ' ') << '^';
+  std::cout << '\n';
+  if (i1 > 0) {
+    std::cout << std::string(i1, ' ') << '^';
+  }
   if (i2 > i1) {
     std::cout << std::string(i2-i1-1, ' ') << '^';
   }
@@ -108,12 +118,12 @@ bool Deck::equalDiscarded(const Deck &other) const {
   if (firstDiscardIndex_ != other.firstDiscardIndex_) {
     return false;
   }
-  std::set<Card> thisCards, otherCards;
   for (size_t i=firstDiscardIndex_; i<cards_.size(); ++i) {
-    thisCards.insert(cards_[i]);
-    otherCards.insert(other.cards_[i]);
+    if (cards_[i] != other.cards_[i]) {
+      return false;
+    }
   }
-  return thisCards == otherCards;
+  return true;
 }
 
 } // namespace sorry

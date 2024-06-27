@@ -124,7 +124,6 @@ sorry::Action SorryMcts::pickBestAction() const {
   }
   // TODO: The below code assumes that all possible actions have been visited once.
   std::vector<size_t> indices(rootNode_->successors.size());
-  std::cout << "Choosing action from " << rootNode_->successors.size() << " actions" << std::endl;
   std::iota(indices.begin(), indices.end(), 0);
   int index = select(rootNode_, /*withExploration=*/false, indices);
   // printActions(rootNode_, 2);
@@ -177,21 +176,36 @@ int SorryMcts::getIterationCount() const {
   return iterationCount_;
 }
 
+void getTreeLevelSizes(Node *node, std::vector<int> &sizes, int level=0) {
+  if (sizes.size() < static_cast<size_t>(level+1)) {
+    sizes.push_back(0);
+  }
+  ++sizes[level];
+  for (Node *child : node->successors) {
+    getTreeLevelSizes(child, sizes, level+1);
+  }
+}
+
 void SorryMcts::doSingleStep(const Sorry &startingState) {
+  constexpr int kDepthOfConcreteHands{1};
   Sorry state = startingState;
-  state.giveOpponentsRandomHands(eng_);
   std::unique_lock lock(treeMutex_);
   Node *currentNode = rootNode_;
+  // Depth represents how many times a player's turn has changed.
+  int depth=0;
   while (!state.gameDone()) {
+    if (depth < kDepthOfConcreteHands) {
+      state.giveOpponentsRandomHands(eng_);
+    }
     // Get all actions.
     const auto actions = state.getActions();
-    bool rolledOut=false;
+    const sorry::PlayerColor currentPlayer = state.getPlayerTurn();
     std::vector<size_t> indices;
     for (const Action &action : actions) {
       // If we don't yet have a node for this action, select it.
       bool foundOurAction = false;
       for (size_t i=0; i<currentNode->successors.size(); ++i) {
-        if (currentNode->successors.at(i)->state == state &&
+        if (currentNode->successors.at(i)->state.equalForPlayer(state, ourPlayer_) &&
             currentNode->successors.at(i)->action == action) {
           // This is our action.
           indices.push_back(i);
@@ -203,6 +217,7 @@ void SorryMcts::doSingleStep(const Sorry &startingState) {
         // Already have a child for this action.
         continue;
       }
+      // std::cout << "New node. Action: " << action.toString() << ", state: " << state.toString() << std::endl;
       // Never tried this action. Create a node for it and then rollout.
       currentNode->successors.push_back(new Node(state, action, currentNode));
       state.doAction(action, eng_);
@@ -214,16 +229,27 @@ void SorryMcts::doSingleStep(const Sorry &startingState) {
 
       // Propagate the result of the rollout back up through the parents.
       backprop(currentNode->successors.back(), winner);
-      rolledOut = true;
-      break;
-    }
-    if (rolledOut) {
+      // Step is done
+      // static int numTimes{1};
+      // if (numTimes % 100 == 0) {
+      //   std::vector<int> sizes;
+      //   getTreeLevelSizes(rootNode_, sizes);
+      //   std::cout << "Sizes: ";
+      //   for (int i : sizes) {
+      //     std::cout << i << ", ";
+      //   }
+      //   std::cout << std::endl;
+      // }
+      // ++numTimes;
       return;
     }
     // All possible actions have been seen before. Select one.
     int index = select(currentNode, /*withExploration=*/true, indices);
     currentNode = currentNode->successors.at(index);
     state.doAction(currentNode->action, eng_);
+    if (state.getPlayerTurn() != currentPlayer) {
+      ++depth;
+    }
   }
   // Game is done.
   backprop(currentNode, state.getWinner());

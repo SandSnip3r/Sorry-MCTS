@@ -21,6 +21,7 @@ public:
 
   bool equalDiscarded(const Deck &other) const;
 private:
+  // Note: Cards >= firstDiscardIndex_ are kept sorted so that comparisons are faster
   std::array<Card, 45> cards_;
   size_t firstOutIndex_;
   size_t firstDiscardIndex_;
